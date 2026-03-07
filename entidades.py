@@ -22,7 +22,8 @@ class Entidad:
         self.cooldown = cooldown_segundos
         self.ultimo_movimiento = 0.0
         self.vivo = True
-        self.tipo = tipo # etiquetas: 'humano1', 'humano2', 'ia'
+        self.tipo = tipo
+        self.max_bombas = 1
 
     def intentar_mover(self, delta_x: int, delta_y: int, tiempo_actual_pc: float, tablero_juego) -> bool:
         # los muertos no caminan
@@ -47,8 +48,12 @@ class Entidad:
     def plantar_bomba(self, tiempo_actual: float, lista_bombas_activas: list):
         if not self.vivo:
             return
-            
-        # validacion: no apilar bombas en la misma celda
+        # validar cantidad de bombas
+        bombas_propias = [b for b in lista_bombas_activas if b.propietario == self]
+        if len(bombas_propias) >= self.max_bombas:
+            return
+        
+        # no apilar bombas en la misma celda
         for bomba in lista_bombas_activas:
             if bomba.x == self.x and bomba.y == self.y:
                 return # abortar
