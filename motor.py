@@ -18,7 +18,7 @@ class Tablero:
         self.ancho = ancho
         self.alto = alto
         self.matriz = np.zeros((alto, ancho), dtype=np.int8)
-        self.fuegos_activos = [] # lista de ParticulaFuego
+        self.fuegos_activos = [] # lista de particulafuego
         self.construir_acero()
         
     def construir_acero(self):
@@ -34,7 +34,7 @@ class Tablero:
             return False
         return self.matriz[y][x] == VACIO
         
-    # LOGICA DE EXPLOSION (Direccional)
+    # logica de explosion direccional
     def detonar_bomba(self, bomba, tiempo_actual: float):
         # 4 direcciones cardinales (dx, dy)
         direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
@@ -65,15 +65,11 @@ class Tablero:
                     self.fuegos_activos.append(ParticulaFuego(nx, ny, tiempo_actual))
 
     def actualizar_fuego(self, tiempo_actual: float):
-        # limpiamos las llamas que ya se consumieron
-        fuegos_vivos = []
-        for fuego in self.fuegos_activos:
-            if not fuego.debe_apagarse(tiempo_actual):
-                fuegos_vivos.append(fuego)
-        self.fuegos_activos = fuegos_vivos
+        # optimizacion: list comprehension para filtrar las llamas vivas directamente
+        self.fuegos_activos = [fuego for fuego in self.fuegos_activos if not fuego.debe_apagarse(tiempo_actual)]
 
     def evaluar_muertes(self, lista_entidades):
-        # evaluacion de impacto: si estas sobre el fuego, mueres.
+        # evaluacion de impacto letal
         for entidad in lista_entidades:
             if not entidad.vivo:
                 continue
@@ -81,30 +77,28 @@ class Tablero:
                 if entidad.x == fuego.x and entidad.y == fuego.y:
                     entidad.vivo = False
                     entidad.emoji = "💀" # actualizamos la textura al morir
+                    break # optimizacion: si ya murio, no evaluar contra mas llamas
 
     def renderizar_consola(self, lista_entidades, lista_bombas):
         sys.stdout.write('\033[H') 
         frame_buffer = []
         
+        # optimizacion espacial o(1): mapear posiciones antes de recorrer la matriz
+        # esto evita usar any() (bucle lineal) en cada una de las 273 celdas
+        mapa_entidades = {(e.x, e.y): e for e in lista_entidades}
+        coords_fuego = {(f.x, f.y) for f in self.fuegos_activos}
+        coords_bomba = {(b.x, b.y) for b in lista_bombas}
+        
         for y in range(self.alto):
             fila_temporal = []
             for x in range(self.ancho):
-                
-                # control de capas (Z-Index): Entidad > Fuego > Bomba > Mapa Base
-                entidad_aqui = None
-                for e in lista_entidades:
-                    if e.x == x and e.y == y:
-                        entidad_aqui = e
-                        break # evitamos iterar de mas si ya encontramos una
-                        
-                fuego_aqui = any(f.x == x and f.y == y for f in self.fuegos_activos)
-                bomba_aqui = any(b.x == x and b.y == y for b in lista_bombas)
-                
-                if entidad_aqui:
-                    fila_temporal.append(entidad_aqui.emoji)
-                elif fuego_aqui:
+                # control de capas (z-index) usando busqueda o(1)
+                pos = (x, y)
+                if pos in mapa_entidades:
+                    fila_temporal.append(mapa_entidades[pos].emoji)
+                elif pos in coords_fuego:
                     fila_temporal.append(DICCIONARIO_SIMBOLOS[FUEGO])
-                elif bomba_aqui:
+                elif pos in coords_bomba:
                     fila_temporal.append(DICCIONARIO_SIMBOLOS[BOMBA])
                 else:
                     codigo_celda = self.matriz[y][x]
