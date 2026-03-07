@@ -21,7 +21,7 @@ class Tablero:
         self.matriz = np.zeros((alto, ancho), dtype=np.int8)
         self.fuegos_activos = [] # lista de particulafuego
         self.construir_acero()
-        algoritmos.generar_laberinto_dfs(self.matriz, self.ancho, self.alto)
+        algoritmos.generar_mapa_bomberman(self.matriz, self.ancho, self.alto)
         
     def construir_acero(self):
         for y in range(self.alto):
