@@ -5,6 +5,7 @@ import sys
 from config import *
 import entidades
 import motor
+import ia_bot
 
 def inicializar_entorno():
     # prepara la terminal segun el sistema operativo
@@ -74,8 +75,13 @@ def main():
         elif keyboard.is_pressed('right'): movimientos['humano2'] = (1, 0)
         if keyboard.is_pressed('enter'): acciones['humano2'] = True
             
-        # logica de la ia (temporalmente en blanco, en modo espera)
-        # movimientos['ia'] = algoritmos.evaluar(...)
+        # logica de la ia
+        for entidad in lista_entidades:
+            if entidad.tipo == "ia":
+                # Le preguntamos al cerebro que quiere hacer
+                movimiento, quiere_bomba = ia_bot.procesar_estado_ia(entidad, mi_juego, bombas_activas)
+                movimientos[entidad.tipo] = movimiento
+                acciones[entidad.tipo] = quiere_bomba
         
         # --- fisica de entidades ---
         for entidad in lista_entidades:
