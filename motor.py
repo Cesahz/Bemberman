@@ -2,6 +2,7 @@ import numpy as np
 import os
 import sys
 from config import *
+import algoritmos
 
 # nueva clase ligera para manejar las llamas asincronas
 class ParticulaFuego:
@@ -20,6 +21,7 @@ class Tablero:
         self.matriz = np.zeros((alto, ancho), dtype=np.int8)
         self.fuegos_activos = [] # lista de particulafuego
         self.construir_acero()
+        algoritmos.generar_laberinto_dfs(self.matriz, self.ancho, self.alto)
         
     def construir_acero(self):
         for y in range(self.alto):
