@@ -55,6 +55,37 @@ def bfs_buscar_ladrillo(inicio_x, inicio_y, tablero, bombas_activas, zonas_pelig
                 
     return (0, 0) 
 
+
+def bfs_buscar_enemigo(inicio_x,inicio_y,tablero,bombas_activas,zonas_peligro,lista_entidades,mi_entidad):
+    cola = deque([(inicio_x, inicio_y, [])])
+    visitado = set([(inicio_x, inicio_y)])
+    direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    #identificar coordenadas de la presa
+    enemigos = [(e.x, e.y) for e in lista_entidades if e.vivo and e != mi_entidad]
+    if not enemigos:
+        return (0, 0)
+    while cola:
+        cx, cy, camino = cola.popleft()
+        #escanear contacto
+        for dx, dy in direcciones:
+            nx = cx + dx
+            ny = cy + dy
+            if (nx, ny) in enemigos:
+                if len(camino) > 0: return camino[0]
+                else: return (0, 0) #cuerpo a cuerpo
+                
+        #expansion tactica hacia el objetivo
+        for dx, dy in direcciones:
+            nx = cx + dx
+            ny = cy + dy
+            if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitado and (nx, ny) not in zonas_peligro:
+                visitado.add((nx,ny))
+                cola.append((nx, ny, camino + [(dx, dy)]))
+    return (0, 0) #presa inalcanzable/bloqueada por muros
+        
+        
+    
+
 # nucleo logico de la maquina de estados
 def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
     if not ia_entidad.vivo:
