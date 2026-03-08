@@ -75,7 +75,7 @@ def main():
                 if keyboard.is_pressed('enter'): acciones[entidad] = True
                 
             elif entidad.tipo == "ia":
-                movimiento, quiere_bomba = ia_bot.procesar_estado_ia(entidad, mi_juego, bombas_activas)
+                movimiento, quiere_bomba = ia_bot.procesar_estado_ia(entidad, mi_juego, bombas_activas, lista_entidades)
                 movimientos[entidad] = movimiento
                 acciones[entidad] = quiere_bomba
         
@@ -88,7 +88,7 @@ def main():
                 entidad.plantar_bomba(tiempo_actual, bombas_activas)
                 
             if dx != 0 or dy != 0:
-                entidad.intentar_mover(dx, dy, tiempo_actual, mi_juego, bombas_activas)
+                entidad.intentar_mover(dx, dy, tiempo_actual, mi_juego, bombas_activas, lista_entidades)
                 
         # --- fisica de bombas y fuego ---
         bombas_sobrevivientes = []
