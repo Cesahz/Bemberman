@@ -43,8 +43,8 @@ def bfs_buscar_ladrillo(inicio_x, inicio_y, tablero, bombas_activas, zonas_pelig
             ny = cy + dy
             if 0 <= nx < tablero.ancho and 0 <= ny < tablero.alto:
                 if tablero.matriz[ny][nx] == MURO_LADRILLO:
-                    if len(camino) > 0: return camino[0]
-                    else: return (0,0)
+                    if len(camino) > 0: return camino[0], len(camino)
+                    else: return (0,0), 0
                     
         # expansion tactica evadiendo fuego y entidades
         for dx, dy in direcciones:
@@ -54,8 +54,7 @@ def bfs_buscar_ladrillo(inicio_x, inicio_y, tablero, bombas_activas, zonas_pelig
                 visitado.add((nx,ny))
                 cola.append((nx, ny, camino + [(dx, dy)]))
                 
-    return (0, 0) 
-
+    return (0, 0), 999
 
 def bfs_buscar_enemigo(inicio_x,inicio_y,tablero,bombas_activas,zonas_peligro,lista_entidades,mi_entidad):
     cola = deque([(inicio_x, inicio_y, [])])
@@ -149,8 +148,23 @@ def evaluar_tablero_minimax(ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas,
     ia_escape = evaluar_opciones_escape(ia_x, ia_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
     distancia = abs(ia_x - ene_x) + abs(ia_y - ene_y)
     
-    #maximizar escape propio, anular escape enemigo, cerrar distancia
-    puntuacion = (ia_escape * 10) - (ene_escape * 25) - (distancia * 5)
+    # logica de reaccion en cadena (amplificacion de dominio)
+    # si hay mas de 1 bomba en la simulacion, premiar posiciones donde entrelazan sus rangos
+    bono_cadena = 0
+    if len(bombas_simuladas) > 1:
+        for b1 in bombas_simuladas:
+            for b2 in bombas_simuladas:
+                if b1 != b2:
+                    # mandamos la lista de bombas vacia a la vision para que solo los muros bloqueen el rayo,
+                    # simulando exactamente como viaja el fuego en el motor principal
+                    if linea_de_vision_despejada(b1.x, b1.y, b2.x, b2.y, tablero, []):
+                        dist_bombas = abs(b1.x - b2.x) + abs(b1.y - b2.y)
+                        # si estan a una distancia conectable, inyectar el bono
+                        if dist_bombas <= b1.rango:
+                            bono_cadena += 50 # incentivo tactico masivo para entrelazar explosivos
+    
+    # maximizar escape propio, anular escape enemigo, cerrar distancia, sumar caos en cadena
+    puntuacion = (ia_escape * 10) - (ene_escape * 25) - (distancia * 5) + bono_cadena
     return puntuacion
 
 def minimax_ab(profundidad, ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades, alfa, beta, es_ia):
@@ -227,71 +241,74 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
     if (ia_entidad.x, ia_entidad.y) in zonas_peligro:
         mov = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, zonas_peligro, bombas_activas, lista_entidades)
         return mov, False
+        
+    enemigos = [e for e in lista_entidades if e.vivo and e != ia_entidad]
+    enemigo_objetivo = enemigos[0] if enemigos else None
     
-    # estado 2: granjero (recoleccion y limpieza)
-    movimiento_granjero = bfs_buscar_ladrillo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades)
+    # metricas espaciales para la toma de decisiones clinicas
+    distancia_enemigo = math.inf
+    if enemigo_objetivo:
+        distancia_enemigo = abs(ia_entidad.x - enemigo_objetivo.x) + abs(ia_entidad.y - enemigo_objetivo.y)
+        
+    movimiento_granjero, distancia_ladrillo = bfs_buscar_ladrillo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades)
     
-    if movimiento_granjero == (0,0):
+    vision_clara = False
+    if enemigo_objetivo:
+        vision_clara = linea_de_vision_despejada(ia_entidad.x, ia_entidad.y, enemigo_objetivo.x, enemigo_objetivo.y, tablero, bombas_activas)
+
+    # jerarquia de la amenaza
+    modo_caza_activo = enemigo_objetivo and (vision_clara or distancia_enemigo <= 3 or (distancia_enemigo <= 7 and distancia_enemigo < distancia_ladrillo))
+    
+    # estado 2: cazador (prioridad letal)
+    if modo_caza_activo:
+        mov_optimo, soltar_carga = decidir_movimiento_letal(ia_entidad, enemigo_objetivo, tablero, bombas_activas, lista_entidades, profundidad_inicial=6)
+        
+        if soltar_carga:
+            return mov_optimo, True # acorralar 
+        elif mov_optimo != (0,0):
+            return mov_optimo, False # avanzar sobre la presa
+            
+    # estado 3: espera tactica (disciplina de posicionamiento)
+    # si acabamos de poner una bomba o hay una cerca, y ya estamos en zona segura, 
+    # nos quedamos quietos esperando la detonacion en lugar de buscar otra caja lejana.
+    if bombas_activas:
+        for b in bombas_activas:
+            # calculamos si estamos en el perimetro de observacion (rango + 2 casillas maximo)
+            dist_bomba = abs(ia_entidad.x - b.x) + abs(ia_entidad.y - b.y)
+            if dist_bomba <= b.rango + 2:
+                return (0, 0), False # inmovilidad tactica absoluta
+                
+    # estado 4: granjero (expansion de dominio en el entorno cercano)
+    if movimiento_granjero == (0,0) and distancia_ladrillo == 0:
         direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
         ladrillo_cerca = False
         for dx,dy in direcciones:
             nx = ia_entidad.x + dx
             ny = ia_entidad.y + dy
-            # validacion estricta de limites para evitar wrap-around
+            # validacion estricta de limites
             if 0 <= nx < tablero.ancho and 0 <= ny < tablero.alto:
                 if tablero.matriz[ny][nx] == MURO_LADRILLO:
                     ladrillo_cerca = True
                     break
                     
         if ladrillo_cerca:
-            # protocolo anti-suicidio predictivo
+            # simulacion de supervivencia post-detonacion
             bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
             peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_activas + [bomba_falsa])
-            
-            # evaluar viabilidad de escape
             escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_activas + [bomba_falsa], lista_entidades)
             
             if escape != (0, 0): 
                 return (0,0), True # detonacion autorizada
             else:
-                return (0,0), False # auto-preservacion: detonacion abortada
-    
+                return (0,0), False # auto-preservacion tactica
+                
     if movimiento_granjero != (0,0):
         return movimiento_granjero, False
-    
-    # estado 3: cazador
-    #si llegamos a este estado significa que no hay nada que nos impida atacar a la otra entidad
-    movimiento_cazador = bfs_buscar_enemigo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades, ia_entidad)
-    
-    enemigos = [e for e in lista_entidades if e.vivo and e != ia_entidad]
-    if enemigos:
-        enemigo_objetivo = enemigos[0] #seleccionar a la presa principal
-        
-        # medir distancia del enemigo para aplicar acorralamiento
-        # calcular distancia Manhattan
-        distancia = abs(ia_entidad.x - enemigo_objetivo.x) + abs(ia_entidad.y - enemigo_objetivo.y)
-        
-        if distancia <= 6:
-            # pensamiento predictivo(Mini-Max heuristico)
-            mov_optimo, soltar_carga = decidir_movimiento_letal(ia_entidad, enemigo_objetivo, tablero, bombas_activas, lista_entidades, profundidad_inicial=9)
-            
-            if soltar_carga:
-                return mov_optimo, True # acorralar (bomba plantada)
-            elif mov_optimo != (0,0):
-                return mov_optimo, False
-                
-    # si no es momento de soltar bomba, ejecutar intercepcion visual 
-    for enemigo in enemigos:
-        if linea_de_vision_despejada(ia_entidad.x, ia_entidad.y, enemigo.x, enemigo.y, tablero, bombas_activas):
-            bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
-            peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_activas + [bomba_falsa])
-            escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_activas + [bomba_falsa], lista_entidades)
-            
-            if escape != (0, 0): 
-                return (0,0), True 
 
-    # si no hay oportunidad tactica de bomba, avanzar hacia el enemigo
-    if movimiento_cazador != (0, 0):
-        return movimiento_cazador, False
+    # estado 5: rastreo pasivo (si no hay ladrillos y el enemigo esta fuera de rango)
+    if enemigo_objetivo:
+        movimiento_rastreo = bfs_buscar_enemigo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades, ia_entidad)
+        if movimiento_rastreo != (0,0):
+            return movimiento_rastreo, False
 
     return (0, 0), False
