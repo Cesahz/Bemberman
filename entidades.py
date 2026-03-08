@@ -45,7 +45,7 @@ class Entidad:
             return True
         
         # consulta de colision
-        if tablero_juego.es_caminable(futuro_x, futuro_y):
+        if tablero_juego.es_caminable(futuro_x, futuro_y, lista_bombas_activas):
             self.x = futuro_x
             self.y = futuro_y
             self.ultimo_movimiento = tiempo_actual_pc
