@@ -7,7 +7,7 @@ import entidades
 def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas, lista_entidades):
     cola = deque([(inicio_x, inicio_y, [])])
     visitados = set([(inicio_x, inicio_y)])
-    
+    fuegos = set((f.x, f.y) for f in tablero.fuegos_activos)
     while cola:
         cx, cy, camino = cola.popleft()
         
@@ -21,7 +21,7 @@ def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas, lista
             nx = cx + dx
             ny = cy + dy
             # filtro topologico total
-            if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitados:
+            if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitados and (nx, ny) not in fuegos:
                 visitados.add((nx, ny))
                 cola.append((nx, ny, camino + [(dx, dy)]))
                 
