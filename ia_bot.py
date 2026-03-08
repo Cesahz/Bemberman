@@ -155,27 +155,43 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
     # estado 3: cazador
     #si llegamos a este estado significa que no hay nada que nos impida atacar a la otra entidad
     movimiento_cazador = bfs_buscar_enemigo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades, ia_entidad)
-    if movimiento_cazador == (0, 0):
-        #si el movimiento es 0,0 puede ser que estemos pegados al enemigo
-        #evaluamos si el enemigo esta a 1 casilla de distancia
-        enemigos = [(e.x, e.y) for e in lista_entidades if e.vivo and e != ia_entidad]
-        direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-        enemigo_cerca = False
-        
-        for dx, dy in direcciones:
-            if (ia_entidad.x + dx, ia_entidad.y + dy) in enemigos:
-                enemigo_cerca = True
-                break
-        if enemigo_cerca:
-            # soltar la trampa si tenemos escape (Reutilizamos el anti-suicidio)
+    
+    # evaluacion tactica de intercepcion
+    # antes de movernos, miramos si tenemos al enemigo en la mira al final del pasillo
+    enemigos = [e for e in lista_entidades if e.vivo and e != ia_entidad]
+    for enemigo in enemigos:
+        if linea_de_vision_despejada(ia_entidad.x, ia_entidad.y, enemigo.x, enemigo.y, tablero, bombas_activas):
+            # protocolo anti-suicidio para la trampa a larga distancia
             bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
             peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_activas + [bomba_falsa])
             escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_activas + [bomba_falsa], lista_entidades)
             
-            if escape != (0, 0): return (0,0), True # jaque mate
+            if escape != (0, 0): 
+                #soltamos bomba para bloquear el pasillo y luego la IA huira sola en el sig frame
+                return (0,0), True 
+                
+    #si no hay linea de vision directa o no pudimos poner bomba, avanzamos hacia la presa
+    if movimiento_cazador == (0, 0):
+        #evaluacion cuerpo a cuerpo (Tu codigo original manteniendolo intacto)
+        enemigos_coords = [(e.x, e.y) for e in enemigos]
+        direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+        enemigo_cerca = False
+        
+        for dx, dy in direcciones:
+            if (ia_entidad.x + dx, ia_entidad.y + dy) in enemigos_coords:
+                enemigo_cerca = True
+                break
+                
+        if enemigo_cerca:
+            bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
+            peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_activas + [bomba_falsa])
+            escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_activas + [bomba_falsa], lista_entidades)
+            
+            if escape != (0, 0): return (0,0), True 
             else: return (0,0), False
+            
     if movimiento_cazador != (0,0):
         return movimiento_cazador, False
-    
-    # Estado 0: Reposo
+
+    # estado 0: reposo
     return (0, 0), False
