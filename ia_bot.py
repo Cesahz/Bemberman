@@ -1,7 +1,7 @@
 import algoritmos
 from collections import deque
 
-def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro):
+def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas):
     #cola de tuplas
     cola = deque([(inicio_x, inicio_y, [])])
     visitados = set([(inicio_x, inicio_y)])
@@ -19,7 +19,10 @@ def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro):
         for dx, dy in direcciones:
             nx = cx + dx
             ny = cy + dy
-            
+            #no pasar por las bombas
+            if tablero.es_caminable(nx, ny, bombas_activas) and (nx, ny) not in visitados:
+                    visitados.add((nx, ny))
+                    cola.append((nx, ny, camino + [(dx, dy)]))
             #evaluar solo los caminables y no visitados
             if tablero.es_caminable(nx, ny) and (nx, ny) not in visitados:
                 visitados.add((nx, ny))
@@ -37,7 +40,7 @@ def procesar_estado_ia(ia_entidad,tablero,bombas_activas):
     #estado 1: supervivencia (prioridad)
     if (ia_entidad.x, ia_entidad.y) in zonas_peligro:
         #apagar todo, ejecutar evasion
-        movimiento_salvavidas = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, zonas_peligro)
+        movimiento_salvavidas = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, zonas_peligro,bombas_activas)
         return movimiento_salvavidas, False
     #temporal hasta tener mas estados
     return (0, 0), False
