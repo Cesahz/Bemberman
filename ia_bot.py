@@ -33,7 +33,7 @@ def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas):
     return (0, 0) # si no hay escape, quedarse quieto
 
 
-def bfs_buscar_ladrillo(inicio_x,inicio_y,tablero,bombas_activas):
+def bfs_buscar_ladrillo(inicio_x,inicio_y,tablero,bombas_activas,zonas_peligro):
     #buscar casillas vacia mas cercana con muros rompibles adyacentes
     cola = deque([(inicio_x,inicio_y,[])])
     visitado = set([(inicio_x,inicio_y)])
@@ -57,9 +57,10 @@ def bfs_buscar_ladrillo(inicio_x,inicio_y,tablero,bombas_activas):
         for dx, dy in direcciones:
             nx = cx + dx
             ny = cy + dy
-            if tablero.es_caminable(nx, ny, bombas_activas) and (nx, ny) not in visitado:
-                visitado.add((nx,ny))
+            if tablero.es_caminable(nx, ny, bombas_activas) and (nx, ny) not in visitado and (nx, ny) not in zonas_peligro:
+                visitado.add((nx, ny))
                 cola.append((nx, ny, camino + [(dx, dy)]))
+
     return (0, 0) # si no hay ladrillos en el mapa 
 
 
@@ -77,7 +78,7 @@ def procesar_estado_ia(ia_entidad,tablero,bombas_activas):
         return movimiento_salvavidas, False
     
     #estado 2: granjero (destruccion y expansion)
-    movimiento_granjero = bfs_buscar_ladrillo(ia_entidad.x,ia_entidad.y,tablero,bombas_activas)
+    movimiento_granjero = bfs_buscar_ladrillo(ia_entidad.x,ia_entidad.y,tablero,bombas_activas,zonas_peligro)
     #si retorna (0,0) significa que ya estamos en un muro
     if movimiento_granjero == (0,0):
         direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
