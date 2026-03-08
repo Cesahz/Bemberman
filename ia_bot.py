@@ -25,7 +25,7 @@ def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas):
                     visitados.add((nx, ny))
                     cola.append((nx, ny, camino + [(dx, dy)]))
             #evaluar solo los caminables y no visitados
-            if tablero.es_caminable(nx, ny) and (nx, ny) not in visitados:
+            if tablero.es_caminable(nx, ny,bombas_activas) and (nx, ny) not in visitados:
                 visitados.add((nx, ny))
                 #guardamos la ruta historial agregando el nuevo paso
                 cola.append((nx, ny, camino + [(dx, dy)]))

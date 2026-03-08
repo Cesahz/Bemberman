@@ -26,6 +26,11 @@ def generar_mapa_bomberman(matriz, ancho, alto):
 
 def obtener_mapa_peligro(tablero, bombas_activas):
     peligro = set()
+    
+    # el fuego actual es muerte inmediata
+    for fuego in tablero.fuegos_activos:
+        peligro.add((fuego.x, fuego.y))
+        
     for bomba in bombas_activas:
         peligro.add((bomba.x, bomba.y)) # el centro de la bomba es peligroso
         # 4 direcciones
