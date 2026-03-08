@@ -32,14 +32,14 @@ def main():
     # 2. arquitectura de modos y poblacion del mapa
     if modo == '1':
         lista_entidades.append(entidades.Entidad(1, 1, "🐱", COOLDOWN_MOVIMIENTO, "humano1"))
-        lista_entidades.append(entidades.Entidad(ANCHO-2, ALTO-2, "🤖", COOLDOWN_MOVIMIENTO, "ia"))
+        lista_entidades.append(entidades.Entidad(ANCHO-2, ALTO-2, "🐭", COOLDOWN_MOVIMIENTO, "ia"))
     elif modo == '2':
-        lista_entidades.append(entidades.Entidad(1, 1, "👾", COOLDOWN_MOVIMIENTO, "ia"))
-        lista_entidades.append(entidades.Entidad(ANCHO-2, ALTO-2, "🤖", COOLDOWN_MOVIMIENTO, "ia"))
+        lista_entidades.append(entidades.Entidad(1, 1, "🐱", COOLDOWN_MOVIMIENTO, "ia"))
+        lista_entidades.append(entidades.Entidad(ANCHO-2, ALTO-2, "🐭", COOLDOWN_MOVIMIENTO, "ia"))
     elif modo == '3':
         lista_entidades.append(entidades.Entidad(1, 1, "🐱", COOLDOWN_MOVIMIENTO, "humano1"))
         # el jugador 2 usa otra etiqueta para separar sus controles de entrada
-        lista_entidades.append(entidades.Entidad(ANCHO-2, ALTO-2, "🦊", COOLDOWN_MOVIMIENTO, "humano2")) 
+        lista_entidades.append(entidades.Entidad(ANCHO-2, ALTO-2, "🐭", COOLDOWN_MOVIMIENTO, "humano2")) 
     else:
         print("Modo no reconocido. Cerrando protocolo.")
         sys.exit()

@@ -83,7 +83,30 @@ def bfs_buscar_enemigo(inicio_x,inicio_y,tablero,bombas_activas,zonas_peligro,li
                 cola.append((nx, ny, camino + [(dx, dy)]))
     return (0, 0) #presa inalcanzable/bloqueada por muros
         
+
+def linea_de_vision_despejada(ia_x, ia_y, objetivo_x, objetivo_y, tablero, bombas_activas):
+    # verificar si esta alineado horizontal o verticalmente
+    if ia_x != objetivo_x and ia_y != objetivo_y:
+        return False # esta en diagonal, no hay linea de vision directa
         
+    # calcular direccion del rayo
+    dx = 0
+    dy = 0
+    if ia_x < objetivo_x: dx = 1
+    elif ia_x > objetivo_x: dx = -1
+    elif ia_y < objetivo_y: dy = 1
+    elif ia_y > objetivo_y: dy = -1
+    
+    # trazar el rayo paso a paso hasta el objetivo
+    cx, cy = ia_x + dx, ia_y + dy
+    while (cx, cy) != (objetivo_x, objetivo_y):
+        # si choca con algo solido, la vision se corta
+        if not tablero.es_caminable(cx, cy, bombas_activas, []):
+            return False
+        cx += dx
+        cy += dy
+        
+    return True # el pasillo esta limpio y el enemigo esta en la mira
     
 
 # nucleo logico de la maquina de estados
@@ -153,3 +176,6 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
             else: return (0,0), False
     if movimiento_cazador != (0,0):
         return movimiento_cazador, False
+    
+    # Estado 0: Reposo
+    return (0, 0), False
