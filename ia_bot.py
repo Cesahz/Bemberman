@@ -3,6 +3,7 @@ from collections import deque
 from config import MURO_LADRILLO, RANGO_BOMBA_INICIAL
 import entidades
 import math
+import heapq
 
 # recibe lista_entidades para evitar colisiones dinamicas
 def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas, lista_entidades):
@@ -56,32 +57,44 @@ def bfs_buscar_ladrillo(inicio_x, inicio_y, tablero, bombas_activas, zonas_pelig
                 
     return (0, 0), 999
 
-def bfs_buscar_enemigo(inicio_x,inicio_y,tablero,bombas_activas,zonas_peligro,lista_entidades,mi_entidad):
-    cola = deque([(inicio_x, inicio_y, [])])
-    visitado = set([(inicio_x, inicio_y)])
-    direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-    #identificar coordenadas de la presa
+def astar_buscar_enemigo(inicio_x, inicio_y, tablero, bombas_activas, zonas_peligro, lista_entidades, mi_entidad):
+    # identificar coordenadas de la presa
     enemigos = [(e.x, e.y) for e in lista_entidades if e.vivo and e != mi_entidad]
     if not enemigos:
         return (0, 0)
-    while cola:
-        cx, cy, camino = cola.popleft()
-        #escanear contacto
+        
+    objetivo_x, objetivo_y = enemigos[0]
+    
+    # heuristica de distancia manhattan
+    def heuristica(cx, cy):
+        return abs(cx - objetivo_x) + abs(cy - objetivo_y)
+
+    # la cola guarda tuplas: (f_score, costo_g, x, y, camino)
+    open_heap = [(heuristica(inicio_x, inicio_y), 0, inicio_x, inicio_y, [])]
+    visitados = set([(inicio_x, inicio_y)])
+    direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    
+    while open_heap:
+        _, costo, cx, cy, camino = heapq.heappop(open_heap)
+        
+        # escanear contacto cuerpo a cuerpo
         for dx, dy in direcciones:
-            nx = cx + dx
-            ny = cy + dy
-            if (nx, ny) in enemigos:
+            if (cx + dx, cy + dy) == (objetivo_x, objetivo_y):
                 if len(camino) > 0: return camino[0]
-                else: return (0, 0) #cuerpo a cuerpo
+                else: return (0, 0)
                 
-        #expansion tactica hacia el objetivo
+        # expansion dirigida por heuristica
         for dx, dy in direcciones:
             nx = cx + dx
             ny = cy + dy
-            if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitado and (nx, ny) not in zonas_peligro:
-                visitado.add((nx,ny))
-                cola.append((nx, ny, camino + [(dx, dy)]))
-    return (0, 0) #presa inalcanzable/bloqueada por muros
+            if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitados and (nx, ny) not in zonas_peligro:
+                visitados.add((nx, ny))
+                nuevo_costo = costo + 1
+                nuevo_camino = camino + [(dx, dy)]
+                f_score = nuevo_costo + heuristica(nx, ny)
+                heapq.heappush(open_heap, (f_score, nuevo_costo, nx, ny, nuevo_camino))
+                
+    return (0, 0) # presa inalcanzable
         
 
 def linea_de_vision_despejada(ia_x, ia_y, objetivo_x, objetivo_y, tablero, bombas_activas):
@@ -109,62 +122,60 @@ def linea_de_vision_despejada(ia_x, ia_y, objetivo_x, objetivo_y, tablero, bomba
     return True # el pasillo esta limpio y el enemigo esta en la mira
     
 
-def evaluar_opciones_escape(x, y, tablero, bombas_activas, zonas_peligro, lista_entidades):
+def medir_jaula_control(x, y, tablero, bombas_activas, zonas_peligro, lista_entidades, limite_area=20):
     """
-    Simula cuántas casillas libres tiene una entidad desde (x, y).
-    Es un BFS limitado a 3 pasos para medir la "libertad de movimiento".
+    flood fill optimizado. mide el area real en la que una entidad esta atrapada.
+    si el area es menor a 4, la entidad esta virtualmente muerta.
     """
-    cola = deque([(x, y, 0)])
+    cola = deque([(x, y)])
     visitados = set([(x, y)])
-    casillas_libres = 0
+    area_disponible = 0
     
-    while cola:
-        cx, cy, pasos = cola.popleft()
-        if pasos >= 4: #limitar rango para rendimiento
-            continue
-            
-        direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    
+    while cola and area_disponible < limite_area:
+        cx, cy = cola.popleft()
+        area_disponible += 1
+        
         for dx, dy in direcciones:
             nx = cx + dx
             ny = cy + dy
+            # las bombas simuladas cuentan como paredes solidas aqui, aislando areas
             if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitados and (nx, ny) not in zonas_peligro:
                 visitados.add((nx, ny))
-                casillas_libres += 1
-                cola.append((nx, ny, pasos + 1))
+                cola.append((nx, ny))
                 
-    return casillas_libres
+    return area_disponible
 
 def evaluar_tablero_minimax(ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades):
     peligro_simulado = algoritmos.obtener_mapa_peligro(tablero, bombas_simuladas)
     
+    # castigo absoluto
     if (ia_x, ia_y) in peligro_simulado:
         return -math.inf
         
-    ene_escape = evaluar_opciones_escape(ene_x, ene_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
+    ene_area = medir_jaula_control(ene_x, ene_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
     
-    if (ene_x, ene_y) in peligro_simulado or ene_escape == 0:
+    # recompensa absoluta: si el enemigo cae en peligro o su jaula es menor a 2 (jaque mate ineludible)
+    if (ene_x, ene_y) in peligro_simulado or ene_area <= 1:
         return math.inf
         
-    ia_escape = evaluar_opciones_escape(ia_x, ia_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
+    ia_area = medir_jaula_control(ia_x, ia_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
     distancia = abs(ia_x - ene_x) + abs(ia_y - ene_y)
     
-    # logica de reaccion en cadena (amplificacion de dominio)
-    # si hay mas de 1 bomba en la simulacion, premiar posiciones donde entrelazan sus rangos
     bono_cadena = 0
     if len(bombas_simuladas) > 1:
         for b1 in bombas_simuladas:
             for b2 in bombas_simuladas:
                 if b1 != b2:
-                    # mandamos la lista de bombas vacia a la vision para que solo los muros bloqueen el rayo,
-                    # simulando exactamente como viaja el fuego en el motor principal
                     if linea_de_vision_despejada(b1.x, b1.y, b2.x, b2.y, tablero, []):
                         dist_bombas = abs(b1.x - b2.x) + abs(b1.y - b2.y)
-                        # si estan a una distancia conectable, inyectar el bono
                         if dist_bombas <= b1.rango:
-                            bono_cadena += 50 # incentivo tactico masivo para entrelazar explosivos
+                            bono_cadena += 50
     
-    # maximizar escape propio, anular escape enemigo, cerrar distancia, sumar caos en cadena
-    puntuacion = (ia_escape * 10) - (ene_escape * 25) - (distancia * 5) + bono_cadena
+    # la magia del acorralamiento: penalizamos fuertemente el area que le dejamos al enemigo.
+    # si la simulacion de poner una bomba reduce su area a 3 casillas, la puntuacion se dispara.
+    puntuacion = (ia_area * 5) - (ene_area * 30) - (distancia * 5) + bono_cadena
     return puntuacion
 
 def minimax_ab(profundidad, ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades, alfa, beta, es_ia):
@@ -307,7 +318,8 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
 
     # estado 5: rastreo pasivo (si no hay ladrillos y el enemigo esta fuera de rango)
     if enemigo_objetivo:
-        movimiento_rastreo = bfs_buscar_enemigo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades, ia_entidad)
+        # actualizamos la llamada a la nueva funcion a*
+        movimiento_rastreo = astar_buscar_enemigo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades, ia_entidad)
         if movimiento_rastreo != (0,0):
             return movimiento_rastreo, False
 
