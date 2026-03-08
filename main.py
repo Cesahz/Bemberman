@@ -93,7 +93,7 @@ def main():
                 entidad.plantar_bomba(tiempo_actual, bombas_activas)
                 
             if dx != 0 or dy != 0:
-                entidad.intentar_mover(dx, dy, tiempo_actual, mi_juego)
+                entidad.intentar_mover(dx, dy, tiempo_actual, mi_juego, bombas_activas)
                 
         # --- fisica de bombas y fuego ---
         bombas_sobrevivientes = []
