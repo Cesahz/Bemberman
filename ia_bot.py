@@ -271,9 +271,9 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
         # calcular distancia Manhattan
         distancia = abs(ia_entidad.x - enemigo_objetivo.x) + abs(ia_entidad.y - enemigo_objetivo.y)
         
-        if distancia <= 4:
+        if distancia <= 6:
             # pensamiento predictivo(Mini-Max heuristico)
-            mov_optimo, soltar_carga = decidir_movimiento_letal(ia_entidad, enemigo_objetivo, tablero, bombas_activas, lista_entidades, profundidad_inicial=4)
+            mov_optimo, soltar_carga = decidir_movimiento_letal(ia_entidad, enemigo_objetivo, tablero, bombas_activas, lista_entidades, profundidad_inicial=9)
             
             if soltar_carga:
                 return mov_optimo, True # acorralar (bomba plantada)

@@ -1,4 +1,3 @@
-import time
 from config import *
 
 class Bomba:
