@@ -31,10 +31,20 @@ class Tablero:
                 elif (y % 2 == 0 and x % 2 == 0):
                     self.matriz[y][x] = MURO_ACERO
 
-    def es_caminable(self, x: int, y: int) -> bool:
+    def es_caminable(self, x: int, y: int, bombas_activas: list) -> bool:
         if x < 0 or x >= self.ancho or y < 0 or y >= self.alto:
             return False
-        return self.matriz[y][x] == VACIO
+            
+        # validar que no hay muros
+        if self.matriz[y][x] != VACIO:
+            return False
+            
+        # verificar si hay bomba
+        for bomba in bombas_activas:
+            if bomba.x == x and bomba.y == y:
+                return False 
+                
+        return True
         
     # logica de explosion direccional
     def detonar_bomba(self, bomba, tiempo_actual: float):
