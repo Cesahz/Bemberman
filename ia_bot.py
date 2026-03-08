@@ -2,6 +2,7 @@ import algoritmos
 from collections import deque
 from config import MURO_LADRILLO, RANGO_BOMBA_INICIAL
 import entidades
+import math
 
 # recibe lista_entidades para evitar colisiones dinamicas
 def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas, lista_entidades):
@@ -109,9 +110,6 @@ def linea_de_vision_despejada(ia_x, ia_y, objetivo_x, objetivo_y, tablero, bomba
     return True # el pasillo esta limpio y el enemigo esta en la mira
     
 
-
-# AÑADIR A ia_bot.py
-
 def evaluar_opciones_escape(x, y, tablero, bombas_activas, zonas_peligro, lista_entidades):
     """
     Simula cuántas casillas libres tiene una entidad desde (x, y).
@@ -137,7 +135,86 @@ def evaluar_opciones_escape(x, y, tablero, bombas_activas, zonas_peligro, lista_
                 
     return casillas_libres
 
+def evaluar_tablero_minimax(ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades):
+    peligro_simulado = algoritmos.obtener_mapa_peligro(tablero, bombas_simuladas)
+    
+    if (ia_x, ia_y) in peligro_simulado:
+        return -math.inf
+        
+    ene_escape = evaluar_opciones_escape(ene_x, ene_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
+    
+    if (ene_x, ene_y) in peligro_simulado or ene_escape == 0:
+        return math.inf
+        
+    ia_escape = evaluar_opciones_escape(ia_x, ia_y, tablero, bombas_simuladas, peligro_simulado, lista_entidades)
+    distancia = abs(ia_x - ene_x) + abs(ia_y - ene_y)
+    
+    #maximizar escape propio, anular escape enemigo, cerrar distancia
+    puntuacion = (ia_escape * 10) - (ene_escape * 25) - (distancia * 5)
+    return puntuacion
 
+def minimax_ab(profundidad, ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades, alfa, beta, es_ia):
+    if profundidad == 0:
+        return evaluar_tablero_minimax(ia_x, ia_y, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades)
+        
+    direcciones = [(0, 0), (0, -1), (0, 1), (-1, 0), (1, 0)]
+    
+    if es_ia:
+        max_eval = -math.inf
+        for dx, dy in direcciones:
+            nx, ny = ia_x + dx, ia_y + dy
+            if tablero.es_caminable(nx, ny, bombas_simuladas, lista_entidades):
+                eval_actual = minimax_ab(profundidad - 1, nx, ny, ene_x, ene_y, tablero, bombas_simuladas, lista_entidades, alfa, beta, False)
+                max_eval = max(max_eval, eval_actual)
+                alfa = max(alfa, eval_actual)
+                if beta <= alfa:
+                    break
+        return max_eval
+        
+    else:
+        min_eval = math.inf
+        for dx, dy in direcciones:
+            nx, ny = ene_x + dx, ene_y + dy
+            if tablero.es_caminable(nx, ny, bombas_simuladas, lista_entidades):
+                eval_actual = minimax_ab(profundidad - 1, ia_x, ia_y, nx, ny, tablero, bombas_simuladas, lista_entidades, alfa, beta, True)
+                min_eval = min(min_eval, eval_actual)
+                beta = min(beta, eval_actual)
+                if beta <= alfa:
+                    break
+        return min_eval
+
+def decidir_movimiento_letal(ia_entidad, enemigo_objetivo, tablero, bombas_activas, lista_entidades, profundidad_inicial=3):
+    mejor_mov = (0, 0)
+    poner_bomba = False
+    mejor_puntaje = -math.inf
+    alfa = -math.inf
+    beta = math.inf
+    direcciones = [(0, 0), (0, -1), (0, 1), (-1, 0), (1, 0)]
+    
+    for dx, dy in direcciones:
+        nx, ny = ia_entidad.x + dx, ia_entidad.y + dy
+        if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades):
+            #rama A: movimiento puro
+            puntaje_mov = minimax_ab(profundidad_inicial - 1, nx, ny, enemigo_objetivo.x, enemigo_objetivo.y, tablero, bombas_activas, lista_entidades, alfa, beta, False)
+            
+            #rama B: soltar bomba y moverse
+            bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
+            bombas_futuras = bombas_activas + [bomba_falsa]
+            puntaje_bomba = minimax_ab(profundidad_inicial - 1, nx, ny, enemigo_objetivo.x, enemigo_objetivo.y, tablero, bombas_futuras, lista_entidades, alfa, beta, False)
+            
+            if puntaje_mov > mejor_puntaje:
+                mejor_puntaje = puntaje_mov
+                mejor_mov = (dx, dy)
+                poner_bomba = False
+                
+            if puntaje_bomba > mejor_puntaje:
+                mejor_puntaje = puntaje_bomba
+                mejor_mov = (dx, dy)
+                poner_bomba = True
+                
+            alfa = max(alfa, mejor_puntaje)
+            
+    return mejor_mov, poner_bomba
 
 # nucleo logico de la maquina de estados
 def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
@@ -196,22 +273,12 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
         
         if distancia <= 4:
             # pensamiento predictivo(Mini-Max heuristico)
-            bomba_imaginaria = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
-            bombas_futuras = bombas_activas + [bomba_imaginaria]
-            peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_futuras)
+            mov_optimo, soltar_carga = decidir_movimiento_letal(ia_entidad, enemigo_objetivo, tablero, bombas_activas, lista_entidades, profundidad_inicial=4)
             
-            # evaluar mi supervivencia
-            mi_escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_futuras, lista_entidades)
-            
-            # evaluar si nuestra bomba ataca al enemigo
-            enemigo_en_peligro = (enemigo_objetivo.x, enemigo_objetivo.y) in peligro_futuro
-            
-            # evaluar la movilidad restante del enemigo si pongo la bomba
-            movilidad_enemigo = evaluar_opciones_escape(enemigo_objetivo.x, enemigo_objetivo.y, tablero, bombas_futuras, peligro_futuro, lista_entidades)
-            
-            # decision final
-            if mi_escape != (0, 0) and (enemigo_en_peligro or movilidad_enemigo <= 1):
-                return (0, 0), True #acorralar
+            if soltar_carga:
+                return mov_optimo, True # acorralar (bomba plantada)
+            elif mov_optimo != (0,0):
+                return mov_optimo, False
                 
     # si no es momento de soltar bomba, ejecutar intercepcion visual 
     for enemigo in enemigos:
