@@ -31,7 +31,7 @@ class Tablero:
                 elif (y % 2 == 0 and x % 2 == 0):
                     self.matriz[y][x] = MURO_ACERO
 
-    def es_caminable(self, x: int, y: int, bombas_activas: list) -> bool:
+    def es_caminable(self, x: int, y: int, bombas_activas: list,lista_entidades: list) -> bool:
         if x < 0 or x >= self.ancho or y < 0 or y >= self.alto:
             return False
             
@@ -42,7 +42,11 @@ class Tablero:
         # verificar si hay bomba
         for bomba in bombas_activas:
             if bomba.x == x and bomba.y == y:
-                return False 
+                return False
+        # verificar si hay otra entidad 
+        for entidad in lista_entidades:
+            if entidad.vivo and entidad.x == x and entidad.y == y:
+                return False
                 
         return True
         
