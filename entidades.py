@@ -25,7 +25,7 @@ class Entidad:
         self.tipo = tipo
         self.max_bombas = 1
 
-    def intentar_mover(self, delta_x: int, delta_y: int, tiempo_actual_pc: float, tablero_juego, lista_bombas_activas: list) -> bool:
+    def intentar_mover(self, delta_x: int, delta_y: int, tiempo_actual_pc: float, tablero_juego, lista_bombas_activas: list, lista_entidades: list) -> bool:
         # los muertos no caminan
         if not self.vivo:
             return False
@@ -37,19 +37,13 @@ class Entidad:
         futuro_x = self.x + delta_x
         futuro_y = self.y + delta_y
         
-        # pasar la bomba al validador
-        if tablero_juego.es_caminable(futuro_x, futuro_y, lista_bombas_activas):
+        # consulta de colision unificada (tablero evalua mapa, bombas y entidades)
+        if tablero_juego.es_caminable(futuro_x, futuro_y, lista_bombas_activas, lista_entidades):
             self.x = futuro_x
             self.y = futuro_y
             self.ultimo_movimiento = tiempo_actual_pc
             return True
-        
-        # consulta de colision
-        if tablero_juego.es_caminable(futuro_x, futuro_y, lista_bombas_activas):
-            self.x = futuro_x
-            self.y = futuro_y
-            self.ultimo_movimiento = tiempo_actual_pc
-            return True
+            
         return False
 
     def plantar_bomba(self, tiempo_actual: float, lista_bombas_activas: list):
