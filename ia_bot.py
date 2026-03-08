@@ -109,6 +109,36 @@ def linea_de_vision_despejada(ia_x, ia_y, objetivo_x, objetivo_y, tablero, bomba
     return True # el pasillo esta limpio y el enemigo esta en la mira
     
 
+
+# AÑADIR A ia_bot.py
+
+def evaluar_opciones_escape(x, y, tablero, bombas_activas, zonas_peligro, lista_entidades):
+    """
+    Simula cuántas casillas libres tiene una entidad desde (x, y).
+    Es un BFS limitado a 3 pasos para medir la "libertad de movimiento".
+    """
+    cola = deque([(x, y, 0)])
+    visitados = set([(x, y)])
+    casillas_libres = 0
+    
+    while cola:
+        cx, cy, pasos = cola.popleft()
+        if pasos >= 4: #limitar rango para rendimiento
+            continue
+            
+        direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+        for dx, dy in direcciones:
+            nx = cx + dx
+            ny = cy + dy
+            if tablero.es_caminable(nx, ny, bombas_activas, lista_entidades) and (nx, ny) not in visitados and (nx, ny) not in zonas_peligro:
+                visitados.add((nx, ny))
+                casillas_libres += 1
+                cola.append((nx, ny, pasos + 1))
+                
+    return casillas_libres
+
+
+
 # nucleo logico de la maquina de estados
 def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
     if not ia_entidad.vivo:
