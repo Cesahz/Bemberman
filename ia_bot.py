@@ -1,5 +1,6 @@
 import algoritmos
 from collections import deque
+from config import MURO_LADRILLO
 
 def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas):
     #cola de tuplas
@@ -30,6 +31,37 @@ def bfs_escape(inicio_x, inicio_y, tablero, zonas_peligro, bombas_activas):
                 cola.append((nx, ny, camino + [(dx, dy)]))
                 
     return (0, 0) # si no hay escape, quedarse quieto
+
+
+def bfs_buscar_ladrillo(inicio_x,inicio_y,tablero,bombas_activas):
+    #buscar casillas vacia mas cercana con muros rompibles adyacentes
+    cola = deque([(inicio_x,inicio_y,[])])
+    visitado = set([(inicio_x,inicio_y)])
+    direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    while cola:
+        cx, cy, camino = cola.popleft()
+        #buscar muros rompibles alado
+        for dx, dy in direcciones:
+            nx = cx + dx
+            ny = cy + dy
+            #validar limites
+            if 0 <= nx < tablero.ancho and 0 <= ny < tablero.alto:
+                if tablero.matriz[ny][nx] == MURO_LADRILLO:
+                    #encontrar muro adyacente
+                    if len(camino) > 0:
+                        return camino[0] #primer paso hacia el objetivo
+                    else:
+                        #si el camino es 0 es porque estamos alao de un ladrillo
+                        return (0,0)
+        #expansion, si no hay ladrillos seguimos buscando
+        for dx, dy in direcciones:
+            nx = cx + dx
+            ny = cy + dy
+            if tablero.es_caminable(nx, ny, bombas_activas) and (nx, ny) not in visitado:
+                visitado.add((nx,ny))
+                cola.append((nx, ny, camino + [(dx, dy)]))
+    return (0, 0) # si no hay ladrillos en el mapa 
+
 
 def procesar_estado_ia(ia_entidad,tablero,bombas_activas):
     #maquina de estados. retorna tupla y si quiere poner bomba
