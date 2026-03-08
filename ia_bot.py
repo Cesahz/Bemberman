@@ -186,42 +186,45 @@ def procesar_estado_ia(ia_entidad, tablero, bombas_activas, lista_entidades):
     #si llegamos a este estado significa que no hay nada que nos impida atacar a la otra entidad
     movimiento_cazador = bfs_buscar_enemigo(ia_entidad.x, ia_entidad.y, tablero, bombas_activas, zonas_peligro, lista_entidades, ia_entidad)
     
-    # evaluacion tactica de intercepcion
-    # antes de movernos, miramos si tenemos al enemigo en la mira al final del pasillo
     enemigos = [e for e in lista_entidades if e.vivo and e != ia_entidad]
+    if enemigos:
+        enemigo_objetivo = enemigos[0] #seleccionar a la presa principal
+        
+        # medir distancia del enemigo para aplicar acorralamiento
+        # calcular distancia Manhattan
+        distancia = abs(ia_entidad.x - enemigo_objetivo.x) + abs(ia_entidad.y - enemigo_objetivo.y)
+        
+        if distancia <= 4:
+            # pensamiento predictivo(Mini-Max heuristico)
+            bomba_imaginaria = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
+            bombas_futuras = bombas_activas + [bomba_imaginaria]
+            peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_futuras)
+            
+            # evaluar mi supervivencia
+            mi_escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_futuras, lista_entidades)
+            
+            # evaluar si nuestra bomba ataca al enemigo
+            enemigo_en_peligro = (enemigo_objetivo.x, enemigo_objetivo.y) in peligro_futuro
+            
+            # evaluar la movilidad restante del enemigo si pongo la bomba
+            movilidad_enemigo = evaluar_opciones_escape(enemigo_objetivo.x, enemigo_objetivo.y, tablero, bombas_futuras, peligro_futuro, lista_entidades)
+            
+            # decision final
+            if mi_escape != (0, 0) and (enemigo_en_peligro or movilidad_enemigo <= 1):
+                return (0, 0), True #acorralar
+                
+    # si no es momento de soltar bomba, ejecutar intercepcion visual 
     for enemigo in enemigos:
         if linea_de_vision_despejada(ia_entidad.x, ia_entidad.y, enemigo.x, enemigo.y, tablero, bombas_activas):
-            # protocolo anti-suicidio para la trampa a larga distancia
             bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
             peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_activas + [bomba_falsa])
             escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_activas + [bomba_falsa], lista_entidades)
             
             if escape != (0, 0): 
-                #soltamos bomba para bloquear el pasillo y luego la IA huira sola en el sig frame
                 return (0,0), True 
-                
-    #si no hay linea de vision directa o no pudimos poner bomba, avanzamos hacia la presa
-    if movimiento_cazador == (0, 0):
-        #evaluacion cuerpo a cuerpo (Tu codigo original manteniendolo intacto)
-        enemigos_coords = [(e.x, e.y) for e in enemigos]
-        direcciones = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-        enemigo_cerca = False
-        
-        for dx, dy in direcciones:
-            if (ia_entidad.x + dx, ia_entidad.y + dy) in enemigos_coords:
-                enemigo_cerca = True
-                break
-                
-        if enemigo_cerca:
-            bomba_falsa = entidades.Bomba(ia_entidad.x, ia_entidad.y, RANGO_BOMBA_INICIAL, 0, ia_entidad)
-            peligro_futuro = algoritmos.obtener_mapa_peligro(tablero, bombas_activas + [bomba_falsa])
-            escape = bfs_escape(ia_entidad.x, ia_entidad.y, tablero, peligro_futuro, bombas_activas + [bomba_falsa], lista_entidades)
-            
-            if escape != (0, 0): return (0,0), True 
-            else: return (0,0), False
-            
-    if movimiento_cazador != (0,0):
+
+    # si no hay oportunidad tactica de bomba, avanzar hacia el enemigo
+    if movimiento_cazador != (0, 0):
         return movimiento_cazador, False
 
-    # estado 0: reposo
     return (0, 0), False
